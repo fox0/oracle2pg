@@ -15,15 +15,18 @@ class Field:
         self.type = '/* TODO */'
         self.is_pk = False
         self.is_null = False
+        self.foreign_table = ''
 
     def __str__(self):
         if self.name.upper() == "ID" and self.type == 'integer' and self.is_pk:
             return '    "{}" serial primary key /* TODO or integer */'.format(self.name.upper())
+
+        # todo self.foreign_table
         return '    "{}" {}{}{}'.format(
             self.name.upper(),
             self.type,
-            'primary key' if self.is_pk else '',
-            'not null' if self.is_pk else '')
+            ' primary key' if self.is_pk else '',
+            ' not null' if self.is_pk and not self.is_pk else '')
 
 
 # CREATE TABLE orders (
@@ -49,13 +52,23 @@ tables = {}
 
 
 def table_field(t: Generator):
+    types_map = {
+        'number': 'integer',
+    }
     token = next(t)
     field = Field(token)
     token = next(t)
-    if token in ('number',):
-        field.type = {
-            'number': 'integer'
-        }[token]
+    if token in types_map:
+        field.type = types_map[token]
+    elif token == 'numeric':
+        token = next(t)
+        if token != '(':
+            raise ValueError(token)
+        token = next(t)
+        token = next(t)
+        if token != ')':
+            raise ValueError(token)
+        field.type = 'integer'
     elif token == 'varchar2':
         token = next(t)
         if token != '(':
