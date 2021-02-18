@@ -1,5 +1,5 @@
 import logging
-from typing import Generator
+from typing import Generator, Dict
 
 from sql_tokenizer import tokenizer
 
@@ -12,38 +12,37 @@ class Field:
     def __init__(self, name: str):
         # log.debug('field %s', name)
         self.name = name
-        self.type = '/* ? */'
+        self.type = '/* TODO */'
         self.is_pk = False
         self.is_null = False
 
     def __str__(self):
-        return '{}"{}" {}{}{}'.format(
-            ' ' * 4,
+        if self.name.upper() == "ID" and self.type == 'integer' and self.is_pk:
+            return '    "{}" serial primary key /* TODO or integer */'.format(self.name.upper())
+        return '    "{}" {}{}{}'.format(
             self.name.upper(),
             self.type,
             'primary key' if self.is_pk else '',
             'not null' if self.is_pk else '')
 
 
+# CREATE TABLE orders (
+#     order_id integer PRIMARY KEY,
+#     product_no integer REFERENCES products,
+#     quantity integer
+# );
+
 class Table:
     def __init__(self, name):
         self.name = name
-        self.fields = {}
+        self.fields: Dict[Field] = {}
 
     def __str__(self):
-        return 'create table "{}"."{}"\n(\n{}\n);'.format(
+        return '\ncreate table "{}"."{}"\n(\n{}\n);'.format(
             SCHEMA,
             self.name.upper(),
-            '\n'.join(str(v) for v in self.fields.values())
+            ',\n'.join(str(v) for v in self.fields.values())
         )
-
-    t = '''\
-CREATE TABLE orders (
-    order_id integer PRIMARY KEY,
-    product_no integer REFERENCES products,
-    quantity integer
-);
-'''
 
 
 tables = {}
@@ -115,8 +114,35 @@ def main():
             if token == 'table':
                 table = create_table(t)
                 log.debug(table)
-                # todo
+                tables[table.name] = table
                 continue
+            else:
+                log.error('%s', token)
+        elif token == 'alter':
+            token = next(t)
+            if token == 'table':
+                token = next(t)
+                table = tables[token]
+                token = next(t)
+                if token == 'add':
+                    token = next(t)
+                    if token == 'constraint':
+                        token = next(t)  # *_pk
+                        token = next(t)
+                        if token != 'primary':
+                            raise ValueError(token)
+                        token = next(t)  # 'key'
+                        token = next(t)  # (
+                        token = next(t)
+                        table.fields[token].is_pk = True
+                        token = next(t)  # )
+                        token = next(t)  # ;
+                        log.debug(table)
+                        continue
+                    else:
+                        log.error('%s', token)
+                else:
+                    log.error('%s', token)
             else:
                 log.error('%s', token)
         else:
